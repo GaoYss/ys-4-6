@@ -266,12 +266,27 @@ function openInstallmentDialog(row) {
   showInstallmentDialog.value = true;
 }
 
+function _roundCentsToYuan(cents) {
+  return Math.trunc(cents) / 100;
+}
+
+function _yuanToCents(yuanStr) {
+  const s = String(yuanStr ?? "0").trim();
+  if (!s) return 0;
+  const [intPart, decPart = ""] = s.split(".");
+  const padded = (decPart + "00").slice(0, 2);
+  const sign = intPart.startsWith("-") ? -1 : 1;
+  const absInt = intPart.replace(/^-/, "") || "0";
+  return sign * (parseInt(absInt, 10) * 100 + parseInt(padded, 10));
+}
+
 function computePreview() {
   if (!currentBill.value) return;
-  const total = Number(currentBill.value.remaining_amount || currentBill.value.amount);
+  const totalYuan = Number(currentBill.value.remaining_amount || currentBill.value.amount);
+  const totalCents = _yuanToCents(totalYuan.toFixed(2));
   const count = Math.min(Math.max(2, installmentForm.count || 2), 12);
-  const base = Math.floor((total / count) * 100) / 100;
-  const remainder = Math.round((total - base * count) * 100) / 100;
+  const baseCents = Math.floor(totalCents / count);
+  const remainderCents = totalCents - baseCents * count;
   const start = installmentForm.first_due_date
     ? new Date(installmentForm.first_due_date)
     : currentBill.value.due_date
@@ -282,8 +297,8 @@ function computePreview() {
     const d = new Date(start);
     d.setDate(d.getDate() + interval * i);
     const iso = d.toISOString().slice(0, 10);
-    const amount = i === count - 1 ? base + remainder : base;
-    return { amount, due_date: iso };
+    const cents = i === count - 1 ? baseCents + remainderCents : baseCents;
+    return { amount: _roundCentsToYuan(cents), due_date: iso };
   });
 }
 
