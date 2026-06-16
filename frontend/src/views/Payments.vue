@@ -122,12 +122,45 @@
             <template #cell-status="{ row }"><StatusBadge :status="row.status" /></template>
             <template #cell-amount="{ row }">¥{{ Number(row.amount).toFixed(2) }}</template>
             <template #actions="{ row }">
-              <button v-if="row.status !== 'paid'" @click="submitPayInstallment(row)">支付本期</button>
+              <button v-if="row.status !== 'paid'" @click="openInstallmentPayDialog(row)">支付本期</button>
             </template>
           </DataTable>
           <div class="modal-actions">
             <button class="secondary" @click="showInstallmentDetail = false">关闭</button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showInstallmentPayDialog" class="modal-overlay" @click.self="showInstallmentPayDialog = false">
+      <div class="modal">
+        <div class="modal-head">
+          <h3>分期缴费确认</h3>
+          <button class="close" @click="showInstallmentPayDialog = false">&times;</button>
+        </div>
+        <div class="modal-body" v-if="currentInstallment && currentBill">
+          <p>账单编号：<strong>{{ currentBill.bill_no }}</strong></p>
+          <p>房屋：{{ currentBill.room_label }} / 业主：{{ currentBill.owner_name }}</p>
+          <p>期次：<strong>第 {{ currentInstallment.sequence }} 期</strong> / 共 {{ currentBill.installment_count }} 期</p>
+          <p>本期金额：<strong class="warn">¥{{ Number(currentInstallment.amount).toFixed(2) }}</strong></p>
+          <p>账单剩余：¥{{ Number(currentBill.remaining_amount).toFixed(2) }}</p>
+          <form class="form-grid" @submit.prevent="submitPayInstallment">
+            <label>支付方式
+              <select v-model="installmentPayForm.method">
+                <option value="wechat">微信</option>
+                <option value="alipay">支付宝</option>
+                <option value="bank">银行卡</option>
+                <option value="cash">现金</option>
+              </select>
+            </label>
+            <label>付款人
+              <input v-model="installmentPayForm.payer" :placeholder="currentBill.owner_name" />
+            </label>
+            <div class="modal-actions">
+              <button type="button" class="secondary" @click="showInstallmentPayDialog = false">取消</button>
+              <button type="submit">确认支付</button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
@@ -178,10 +211,13 @@ const methodLabels = { wechat: "微信", alipay: "支付宝", bank: "银行卡",
 const showPayDialog = ref(false);
 const showInstallmentDialog = ref(false);
 const showInstallmentDetail = ref(false);
+const showInstallmentPayDialog = ref(false);
 const currentBill = ref(null);
+const currentInstallment = ref(null);
 
 const payForm = reactive({ amount: 0, method: "wechat", payer: "" });
 const installmentForm = reactive({ count: 3, first_due_date: "", interval_days: 30 });
+const installmentPayForm = reactive({ method: "wechat", payer: "" });
 const installmentPreview = ref([]);
 
 async function load() {
@@ -254,8 +290,19 @@ async function openInstallmentDetail(row) {
   showInstallmentDetail.value = true;
 }
 
-async function submitPayInstallment(inst) {
-  await propertyApi.payInstallment(inst.id, { method: "wechat", payer: currentBill.value.owner_name });
+function openInstallmentPayDialog(inst) {
+  currentInstallment.value = inst;
+  installmentPayForm.method = "wechat";
+  installmentPayForm.payer = currentBill.value.owner_name;
+  showInstallmentPayDialog.value = true;
+}
+
+async function submitPayInstallment() {
+  await propertyApi.payInstallment(currentInstallment.value.id, {
+    method: installmentPayForm.method,
+    payer: installmentPayForm.payer
+  });
+  showInstallmentPayDialog.value = false;
   const detail = await propertyApi.getBill(currentBill.value.id);
   currentBill.value = detail;
   await load();

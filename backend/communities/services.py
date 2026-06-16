@@ -107,6 +107,10 @@ def create_installments(bill, count, first_due_date=None, interval_days=30):
         )
         installments.append(inst)
 
+    if bill.status in {Bill.UNPAID, Bill.OVERDUE}:
+        bill.status = Bill.PARTIAL
+        bill.save(update_fields=["status"])
+
     return installments
 
 
