@@ -46,7 +46,7 @@ def _update_bill_status_after_payment(bill):
         bill.status = Bill.PAID
         bill.paid_at = timezone.now()
     elif bill.paid_amount > Decimal("0.00"):
-        if bill.status in {Bill.UNPAID, Bill.OVERDUE}:
+        if bill.status == Bill.UNPAID:
             bill.status = Bill.PARTIAL
     bill.save(update_fields=["status", "paid_at"])
 
@@ -86,8 +86,10 @@ def create_installments(bill, count, first_due_date=None, interval_days=30):
         raise ValueError("作废账单不能分期")
     if bill.has_installments:
         raise ValueError("该账单已存在分期记录")
+    if bill.remaining_amount <= Decimal("0.00"):
+        raise ValueError("该账单剩余金额为 0，无需分期")
 
-    total = bill.amount
+    total = bill.remaining_amount
     base = (total / count).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
     remainder = (total - base * count).quantize(Decimal("0.01"))
 
@@ -107,7 +109,7 @@ def create_installments(bill, count, first_due_date=None, interval_days=30):
         )
         installments.append(inst)
 
-    if bill.status in {Bill.UNPAID, Bill.OVERDUE}:
+    if bill.status == Bill.UNPAID:
         bill.status = Bill.PARTIAL
         bill.save(update_fields=["status"])
 

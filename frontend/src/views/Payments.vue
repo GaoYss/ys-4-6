@@ -6,7 +6,12 @@
         <button @click="load">刷新</button>
       </div>
       <DataTable :columns="billColumns" :rows="unpaidBills">
-        <template #cell-status="{ row }"><StatusBadge :status="row.status" /></template>
+        <template #cell-status="{ row }">
+          <div class="status-col">
+            <StatusBadge :status="row.status" />
+            <span v-if="row.is_overdue && row.status !== 'overdue'" class="overdue-tag">已逾期</span>
+          </div>
+        </template>
         <template #cell-amount="{ row }">¥{{ Number(row.amount).toFixed(2) }}</template>
         <template #cell-paid_amount="{ row }">¥{{ Number(row.paid_amount).toFixed(2) }}</template>
         <template #cell-remaining_amount="{ row }">¥{{ Number(row.remaining_amount).toFixed(2) }}</template>
@@ -81,7 +86,8 @@
         </div>
         <div class="modal-body" v-if="currentBill">
           <p>账单编号：<strong>{{ currentBill.bill_no }}</strong></p>
-          <p>应收总额：<strong>¥{{ Number(currentBill.amount).toFixed(2) }}</strong></p>
+          <p>应收：¥{{ Number(currentBill.amount).toFixed(2) }} / 已缴：¥{{ Number(currentBill.paid_amount).toFixed(2) }}</p>
+          <p>分期拆分总额（剩余金额）：<strong class="warn">¥{{ Number(currentBill.remaining_amount).toFixed(2) }}</strong></p>
           <form class="form-grid" @submit.prevent="submitInstallment">
             <label>分期期数（2-12）
               <input type="number" v-model.number="installmentForm.count" min="2" max="12" required />
@@ -112,7 +118,10 @@
     <div v-if="showInstallmentDetail" class="modal-overlay" @click.self="showInstallmentDetail = false">
       <div class="modal wide">
         <div class="modal-head">
-          <h3>分期详情 - {{ currentBill?.bill_no }}</h3>
+          <h3>
+            分期详情 - {{ currentBill?.bill_no }}
+            <span v-if="currentBill?.is_overdue" class="overdue-tag-inline">已逾期</span>
+          </h3>
           <button class="close" @click="showInstallmentDetail = false">&times;</button>
         </div>
         <div class="modal-body" v-if="currentBill">
@@ -143,7 +152,8 @@
           <p>房屋：{{ currentBill.room_label }} / 业主：{{ currentBill.owner_name }}</p>
           <p>期次：<strong>第 {{ currentInstallment.sequence }} 期</strong> / 共 {{ currentBill.installment_count }} 期</p>
           <p>本期金额：<strong class="warn">¥{{ Number(currentInstallment.amount).toFixed(2) }}</strong></p>
-          <p>账单剩余：¥{{ Number(currentBill.remaining_amount).toFixed(2) }}</p>
+          <p>当前账单剩余：¥{{ Number(currentBill.remaining_amount).toFixed(2) }}</p>
+          <p>付完本期后剩余：<strong>¥{{ afterPayRemaining.toFixed(2) }}</strong></p>
           <form class="form-grid" @submit.prevent="submitPayInstallment">
             <label>支付方式
               <select v-model="installmentPayForm.method">
@@ -176,6 +186,11 @@ import StatusBadge from "../components/StatusBadge.vue";
 const bills = ref([]);
 const payments = ref([]);
 const unpaidBills = computed(() => bills.value.filter((bill) => ["unpaid", "partial", "overdue"].includes(bill.status)));
+const afterPayRemaining = computed(() => {
+  if (!currentBill.value || !currentInstallment.value) return 0;
+  const remaining = Number(currentBill.value.remaining_amount) - Number(currentInstallment.value.amount);
+  return remaining < 0 ? 0 : Math.round(remaining * 100) / 100;
+});
 
 const billColumns = [
   { key: "bill_no", label: "账单编号" },
@@ -253,7 +268,7 @@ function openInstallmentDialog(row) {
 
 function computePreview() {
   if (!currentBill.value) return;
-  const total = Number(currentBill.value.amount);
+  const total = Number(currentBill.value.remaining_amount || currentBill.value.amount);
   const count = Math.min(Math.max(2, installmentForm.count || 2), 12);
   const base = Math.floor((total / count) * 100) / 100;
   const remainder = Math.round((total - base * count) * 100) / 100;
@@ -367,4 +382,28 @@ onMounted(load);
 .preview ul { margin: 6px 0 0; padding-left: 20px; }
 .preview li { padding: 2px 0; color: #334155; }
 .actions button + button { margin-left: 6px; }
+.status-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+.overdue-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #ffe2e2;
+  color: #b42318;
+  font-size: 12px;
+}
+.overdue-tag-inline {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #ffe2e2;
+  color: #b42318;
+  font-size: 13px;
+  font-weight: 500;
+}
 </style>

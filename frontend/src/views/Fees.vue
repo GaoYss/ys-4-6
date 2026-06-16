@@ -47,7 +47,12 @@
         <h2>账单列表</h2>
       </div>
       <DataTable :columns="billColumns" :rows="bills">
-        <template #cell-status="{ row }"><StatusBadge :status="row.status" /></template>
+        <template #cell-status="{ row }">
+          <div class="status-col">
+            <StatusBadge :status="row.status" />
+            <span v-if="row.is_overdue && row.status !== 'overdue'" class="overdue-tag">已逾期</span>
+          </div>
+        </template>
         <template #cell-amount="{ row }">¥{{ Number(row.amount).toFixed(2) }}</template>
         <template #cell-paid_amount="{ row }">¥{{ Number(row.paid_amount).toFixed(2) }}</template>
         <template #cell-remaining_amount="{ row }">¥{{ Number(row.remaining_amount).toFixed(2) }}</template>
@@ -61,6 +66,23 @@
     </section>
   </div>
 </template>
+
+<style scoped>
+.status-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+.overdue-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #ffe2e2;
+  color: #b42318;
+  font-size: 12px;
+}
+</style>
 
 <script setup>
 import { onMounted, reactive, ref } from "vue";
