@@ -264,6 +264,11 @@ th {
   color: #b42318;
 }
 
+.status-badge.partial {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
 .toolbar {
   display: flex;
   gap: 10px;

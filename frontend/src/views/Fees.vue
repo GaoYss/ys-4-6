@@ -49,6 +49,14 @@
       <DataTable :columns="billColumns" :rows="bills">
         <template #cell-status="{ row }"><StatusBadge :status="row.status" /></template>
         <template #cell-amount="{ row }">¥{{ Number(row.amount).toFixed(2) }}</template>
+        <template #cell-paid_amount="{ row }">¥{{ Number(row.paid_amount).toFixed(2) }}</template>
+        <template #cell-remaining_amount="{ row }">¥{{ Number(row.remaining_amount).toFixed(2) }}</template>
+        <template #cell-installments="{ row }">
+          <span v-if="row.has_installments">
+            第 {{ row.paid_installment_count }}/{{ row.installment_count }} 期
+          </span>
+          <span v-else>-</span>
+        </template>
       </DataTable>
     </section>
   </div>
@@ -77,7 +85,10 @@ const billColumns = [
   { key: "owner_name", label: "业主" },
   { key: "fee_name", label: "费用" },
   { key: "period", label: "账期" },
-  { key: "amount", label: "金额" },
+  { key: "amount", label: "应收" },
+  { key: "paid_amount", label: "已缴" },
+  { key: "remaining_amount", label: "剩余" },
+  { key: "installments", label: "分期" },
   { key: "status", label: "状态" }
 ];
 

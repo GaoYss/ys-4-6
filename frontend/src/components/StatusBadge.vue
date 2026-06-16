@@ -7,6 +7,7 @@ defineProps({ status: { type: String, required: true } });
 
 const labels = {
   unpaid: "待缴费",
+  partial: "部分缴费",
   paid: "已缴费",
   overdue: "已逾期",
   cancelled: "已作废",

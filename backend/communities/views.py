@@ -4,17 +4,26 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 
-from .models import Bill, Building, FeeType, Payment, Reminder, Room
+from .models import Bill, Building, FeeType, Installment, Payment, Reminder, Room
 from .serializers import (
     BillSerializer,
     BuildingDetailSerializer,
     BuildingSerializer,
+    CreateInstallmentsSerializer,
     FeeTypeSerializer,
+    InstallmentSerializer,
     PaymentSerializer,
     ReminderSerializer,
     RoomSerializer,
 )
-from .services import create_overdue_reminders, dashboard_stats, generate_bills, pay_bill
+from .services import (
+    create_installments,
+    create_overdue_reminders,
+    dashboard_stats,
+    generate_bills,
+    pay_bill,
+    pay_installment,
+)
 
 
 class BuildingViewSet(viewsets.ModelViewSet):
@@ -81,20 +90,82 @@ class BillViewSet(viewsets.ModelViewSet):
     def pay(self, request, pk=None):
         bill = self.get_object()
         try:
-            payment = pay_bill(bill, request.data.get("method", Payment.WECHAT), request.data.get("payer", ""))
+            payment = pay_bill(
+                bill,
+                request.data.get("method", Payment.WECHAT),
+                request.data.get("payer", ""),
+                request.data.get("amount"),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"])
+    def create_installments(self, request, pk=None):
+        bill = self.get_object()
+        serializer = CreateInstallmentsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            installments = create_installments(
+                bill,
+                serializer.validated_data["count"],
+                serializer.validated_data.get("first_due_date"),
+                serializer.validated_data.get("interval_days", 30),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                "created_count": len(installments),
+                "installments": InstallmentSerializer(installments, many=True).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class InstallmentViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Installment.objects.select_related("bill", "bill__room", "bill__room__building", "bill__fee_type").all()
+    serializer_class = InstallmentSerializer
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        bill = self.request.query_params.get("bill")
+        if bill:
+            queryset = queryset.filter(bill_id=bill)
+        status_filter = self.request.query_params.get("status")
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        return queryset
+
+    @action(detail=True, methods=["post"])
+    def pay(self, request, pk=None):
+        installment = self.get_object()
+        try:
+            payment = pay_installment(
+                installment,
+                request.data.get("method", Payment.WECHAT),
+                request.data.get("payer", ""),
+            )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(PaymentSerializer(payment).data, status=status.HTTP_201_CREATED)
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
-    queryset = Payment.objects.select_related("bill", "bill__room", "bill__room__building", "bill__fee_type").all()
+    queryset = Payment.objects.select_related(
+        "bill", "bill__room", "bill__room__building", "bill__fee_type", "installment"
+    ).all()
     serializer_class = PaymentSerializer
 
     def create(self, request, *args, **kwargs):
         bill = get_object_or_404(Bill.objects.select_related("room"), pk=request.data.get("bill"))
         try:
-            payment = pay_bill(bill, request.data.get("method", Payment.WECHAT), request.data.get("payer", ""))
+            payment = pay_bill(
+                bill,
+                request.data.get("method", Payment.WECHAT),
+                request.data.get("payer", ""),
+                request.data.get("amount"),
+            )
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response(self.get_serializer(payment).data, status=status.HTTP_201_CREATED)

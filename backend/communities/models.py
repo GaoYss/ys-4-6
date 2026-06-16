@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.db import models
+from django.db.models import Sum
 from django.utils import timezone
 
 
@@ -80,11 +81,13 @@ class FeeType(models.Model):
 
 class Bill(models.Model):
     UNPAID = "unpaid"
+    PARTIAL = "partial"
     PAID = "paid"
     OVERDUE = "overdue"
     CANCELLED = "cancelled"
     STATUS_CHOICES = (
         (UNPAID, "待缴费"),
+        (PARTIAL, "部分缴费"),
         (PAID, "已缴费"),
         (OVERDUE, "已逾期"),
         (CANCELLED, "已作废"),
@@ -111,6 +114,60 @@ class Bill(models.Model):
 
     @property
     def is_overdue(self):
+        return self.status in {self.UNPAID, self.PARTIAL, self.OVERDUE} and self.due_date < timezone.localdate()
+
+    @property
+    def paid_amount(self):
+        total = self.payments.aggregate(total=Sum("amount"))["total"]
+        return total or Decimal("0.00")
+
+    @property
+    def remaining_amount(self):
+        return (self.amount - self.paid_amount).quantize(Decimal("0.01"))
+
+    @property
+    def has_installments(self):
+        return self.installments.exists()
+
+    @property
+    def installment_count(self):
+        return self.installments.count()
+
+    @property
+    def paid_installment_count(self):
+        return self.installments.filter(status=Installment.PAID).count()
+
+
+class Installment(models.Model):
+    UNPAID = "unpaid"
+    PAID = "paid"
+    OVERDUE = "overdue"
+    STATUS_CHOICES = (
+        (UNPAID, "待缴费"),
+        (PAID, "已缴费"),
+        (OVERDUE, "已逾期"),
+    )
+
+    installment_no = models.CharField("分期编号", max_length=40, unique=True)
+    bill = models.ForeignKey(Bill, related_name="installments", on_delete=models.CASCADE)
+    sequence = models.PositiveIntegerField("期次")
+    amount = models.DecimalField("分期金额", max_digits=10, decimal_places=2)
+    due_date = models.DateField("截止日期")
+    status = models.CharField("状态", max_length=20, choices=STATUS_CHOICES, default=UNPAID)
+    paid_at = models.DateTimeField("缴费时间", null=True, blank=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        ordering = ["bill", "sequence"]
+        unique_together = ("bill", "sequence")
+        verbose_name = "分期记录"
+        verbose_name_plural = "分期记录"
+
+    def __str__(self):
+        return f"{self.installment_no} (第{self.sequence}期)"
+
+    @property
+    def is_overdue(self):
         return self.status in {self.UNPAID, self.OVERDUE} and self.due_date < timezone.localdate()
 
 
@@ -127,7 +184,14 @@ class Payment(models.Model):
     )
 
     payment_no = models.CharField("支付流水号", max_length=40, unique=True)
-    bill = models.OneToOneField(Bill, related_name="payment", on_delete=models.PROTECT)
+    bill = models.ForeignKey(Bill, related_name="payments", on_delete=models.PROTECT)
+    installment = models.OneToOneField(
+        Installment,
+        related_name="payment",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+    )
     amount = models.DecimalField("实收金额", max_digits=10, decimal_places=2)
     method = models.CharField("支付方式", max_length=20, choices=METHOD_CHOICES, default=WECHAT)
     paid_at = models.DateTimeField("支付时间", default=timezone.now)

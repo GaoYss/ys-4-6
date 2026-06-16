@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Bill, Building, FeeType, Payment, Reminder, Room
+from .models import Bill, Building, FeeType, Installment, Payment, Reminder, Room
 
 
 @admin.register(Building)
@@ -29,9 +29,16 @@ class BillAdmin(admin.ModelAdmin):
     search_fields = ("bill_no", "room__room_no", "room__owner_name")
 
 
+@admin.register(Installment)
+class InstallmentAdmin(admin.ModelAdmin):
+    list_display = ("installment_no", "bill", "sequence", "amount", "status", "due_date", "paid_at")
+    list_filter = ("status",)
+    search_fields = ("installment_no", "bill__bill_no")
+
+
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ("payment_no", "bill", "amount", "method", "paid_at", "receipt_no")
+    list_display = ("payment_no", "bill", "installment", "amount", "method", "paid_at", "receipt_no")
     list_filter = ("method", "paid_at")
     search_fields = ("payment_no", "receipt_no", "bill__bill_no")
 

@@ -9,8 +9,13 @@ export const propertyApi = {
   listFeeTypes: () => http.get("/fee-types/").then(unwrap),
   createFeeType: (payload) => http.post("/fee-types/", payload).then(unwrap),
   listBills: (params = {}) => http.get("/bills/", { params }).then(unwrap),
+  getBill: (id) => http.get(`/bills/${id}/`).then(unwrap),
   generateBills: (payload) => http.post("/bills/generate/", payload).then(unwrap),
   payBill: (id, payload) => http.post(`/bills/${id}/pay/`, payload).then(unwrap),
+  createInstallments: (id, payload) => http.post(`/bills/${id}/create_installments/`, payload).then(unwrap),
+  listInstallments: (params = {}) => http.get("/installments/", { params }).then(unwrap),
+  getInstallment: (id) => http.get(`/installments/${id}/`).then(unwrap),
+  payInstallment: (id, payload) => http.post(`/installments/${id}/pay/`, payload).then(unwrap),
   listPayments: () => http.get("/payments/").then(unwrap),
   listReminders: () => http.get("/reminders/").then(unwrap),
   createOverdueReminders: (payload) => http.post("/reminders/create_overdue/", payload).then(unwrap)
