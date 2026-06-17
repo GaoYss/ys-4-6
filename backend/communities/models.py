@@ -102,6 +102,7 @@ class Bill(models.Model):
     due_date = models.DateField("截止日期")
     generated_at = models.DateTimeField("生成时间", auto_now_add=True)
     paid_at = models.DateTimeField("缴费时间", null=True, blank=True)
+    ever_overdue = models.BooleanField("曾逾期", default=False)
 
     class Meta:
         ordering = ["-generated_at"]
@@ -114,7 +115,19 @@ class Bill(models.Model):
 
     @property
     def is_overdue(self):
-        return self.status in {self.UNPAID, self.PARTIAL, self.OVERDUE} and self.due_date < timezone.localdate()
+        if self.status == self.PAID or self.status == self.CANCELLED:
+            return False
+        if self.status == self.OVERDUE:
+            return True
+        if self.due_date < timezone.localdate():
+            return True
+        if self.installments.exists():
+            today = timezone.localdate()
+            return self.installments.filter(
+                status__in={Installment.UNPAID, Installment.OVERDUE},
+                due_date__lt=today,
+            ).exists()
+        return False
 
     @property
     def paid_amount(self):

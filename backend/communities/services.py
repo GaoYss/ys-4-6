@@ -2,7 +2,7 @@ from datetime import timedelta
 from decimal import Decimal, ROUND_DOWN, ROUND_UP
 
 from django.db import transaction
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.utils import timezone
 
 from .models import Bill, Building, FeeType, Installment, Payment, Reminder, Room
@@ -49,9 +49,10 @@ def _update_bill_status_after_payment(bill):
         if bill.status == Bill.UNPAID:
             if bill.due_date < timezone.localdate():
                 bill.status = Bill.OVERDUE
+                bill.ever_overdue = True
             else:
                 bill.status = Bill.PARTIAL
-    bill.save(update_fields=["status", "paid_at"])
+    bill.save(update_fields=["status", "paid_at", "ever_overdue"])
 
 
 @transaction.atomic
@@ -115,9 +116,10 @@ def create_installments(bill, count, first_due_date=None, interval_days=30):
     if bill.status == Bill.UNPAID:
         if bill.due_date < timezone.localdate():
             bill.status = Bill.OVERDUE
+            bill.ever_overdue = True
         else:
             bill.status = Bill.PARTIAL
-        bill.save(update_fields=["status"])
+        bill.save(update_fields=["status", "ever_overdue"])
 
     return installments
 
@@ -162,8 +164,8 @@ def create_overdue_reminders(channel=Reminder.SMS):
     bills = (
         Bill.objects.filter(status__in=[Bill.UNPAID, Bill.PARTIAL, Bill.OVERDUE])
         .filter(
-            models.Q(due_date__lt=today)
-            | (models.Q(Exists(has_installment)) & models.Q(Exists(installment_overdue)))
+            Q(due_date__lt=today)
+            | (Q(Exists(has_installment)) & Q(Exists(installment_overdue)))
         )
         .select_related("room", "room__building", "fee_type")
         .distinct()
@@ -172,7 +174,8 @@ def create_overdue_reminders(channel=Reminder.SMS):
     reminders = []
     for bill in bills:
         bill.status = Bill.OVERDUE
-        bill.save(update_fields=["status"])
+        bill.ever_overdue = True
+        bill.save(update_fields=["status", "ever_overdue"])
         Installment.objects.filter(
             bill=bill,
             status__in=[Installment.UNPAID, Installment.OVERDUE],
@@ -212,7 +215,7 @@ def dashboard_stats():
 
     Bill.objects.filter(
         status__in=[Bill.UNPAID, Bill.PARTIAL], due_date__lt=today
-    ).update(status=Bill.OVERDUE)
+    ).update(status=Bill.OVERDUE, ever_overdue=True)
 
     has_installment = Installment.objects.filter(bill=OuterRef("pk"))
     inst_overdue = Installment.objects.filter(
@@ -227,7 +230,7 @@ def dashboard_stats():
         .values_list("id", flat=True)
     )
     if bill_ids:
-        Bill.objects.filter(id__in=bill_ids).update(status=Bill.OVERDUE)
+        Bill.objects.filter(id__in=bill_ids).update(status=Bill.OVERDUE, ever_overdue=True)
 
     Installment.objects.filter(status=Installment.UNPAID, due_date__lt=today).update(status=Installment.OVERDUE)
 

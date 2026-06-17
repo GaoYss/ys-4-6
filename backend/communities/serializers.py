@@ -77,6 +77,7 @@ class BillSerializer(serializers.ModelSerializer):
     installment_count = serializers.IntegerField(read_only=True)
     paid_installment_count = serializers.IntegerField(read_only=True)
     installments = InstallmentSerializer(many=True, read_only=True)
+    ever_overdue = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Bill
@@ -102,6 +103,7 @@ class BillSerializer(serializers.ModelSerializer):
             "installment_count",
             "paid_installment_count",
             "installments",
+            "ever_overdue",
         ]
         read_only_fields = [
             "bill_no",
@@ -114,6 +116,7 @@ class BillSerializer(serializers.ModelSerializer):
             "has_installments",
             "installment_count",
             "paid_installment_count",
+            "ever_overdue",
         ]
 
     def get_room_label(self, obj):
@@ -128,6 +131,8 @@ class PaymentSerializer(serializers.ModelSerializer):
     period = serializers.CharField(source="bill.period", read_only=True)
     installment_no = serializers.CharField(source="installment.installment_no", read_only=True, allow_null=True)
     installment_sequence = serializers.IntegerField(source="installment.sequence", read_only=True, allow_null=True)
+    bill_is_overdue = serializers.BooleanField(source="bill.is_overdue", read_only=True)
+    bill_ever_overdue = serializers.BooleanField(source="bill.ever_overdue", read_only=True)
 
     class Meta:
         model = Payment
@@ -148,8 +153,10 @@ class PaymentSerializer(serializers.ModelSerializer):
             "paid_at",
             "payer",
             "receipt_no",
+            "bill_is_overdue",
+            "bill_ever_overdue",
         ]
-        read_only_fields = ["payment_no", "receipt_no", "paid_at", "installment_no", "installment_sequence"]
+        read_only_fields = ["payment_no", "receipt_no", "paid_at", "installment_no", "installment_sequence", "bill_is_overdue", "bill_ever_overdue"]
 
     def get_room_label(self, obj):
         return f"{obj.bill.room.building.name}-{obj.bill.room.room_no}"

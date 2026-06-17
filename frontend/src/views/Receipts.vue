@@ -8,8 +8,12 @@
       <DataTable :columns="columns" :rows="payments" @click="noop">
         <template #cell-amount="{ row }">¥{{ Number(row.amount).toFixed(2) }}</template>
         <template #cell-type="{ row }">
-          <span v-if="row.installment_sequence" class="inst-tag">分期第 {{ row.installment_sequence }} 期</span>
-          <span v-else class="normal-tag">普通缴费</span>
+          <div class="type-tags">
+            <span v-if="row.installment_sequence" class="inst-tag">分期第 {{ row.installment_sequence }} 期</span>
+            <span v-else class="normal-tag">普通缴费</span>
+            <span v-if="row.bill_is_overdue" class="overdue-tag">已逾期</span>
+            <span v-else-if="row.bill_ever_overdue" class="ever-overdue-tag">曾逾期</span>
+          </div>
         </template>
         <template #actions="{ row }">
           <button @click="selected = row">预览</button>
@@ -29,6 +33,11 @@
           <div><dt>费用</dt><dd>{{ selected.period }} {{ selected.fee_name }}</dd></div>
           <div v-if="selected.installment_sequence"><dt>缴费类型</dt><dd>分期缴费 · 第 {{ selected.installment_sequence }} 期</dd></div>
           <div v-else><dt>缴费类型</dt><dd>全额缴费</dd></div>
+          <div><dt>逾期情况</dt><dd>
+            <span v-if="selected.bill_is_overdue" class="overdue-text">账单已逾期</span>
+            <span v-else-if="selected.bill_ever_overdue" class="ever-overdue-text">账单曾逾期（已缴清）</span>
+            <span v-else>正常</span>
+          </dd></div>
           <div><dt>金额</dt><dd>¥{{ Number(selected.amount).toFixed(2) }}</dd></div>
           <div><dt>支付方式</dt><dd>{{ methodLabels[selected.method] || selected.method }}</dd></div>
           <div><dt>支付时间</dt><dd>{{ selected.paid_at }}</dd></div>
@@ -91,5 +100,35 @@ onMounted(load);
   background: #dff4eb;
   color: #147050;
   font-size: 12px;
+}
+.overdue-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #ffe2e2;
+  color: #b42318;
+  font-size: 12px;
+}
+.ever-overdue-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+}
+.type-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+.overdue-text {
+  color: #b42318;
+  font-weight: 500;
+}
+.ever-overdue-text {
+  color: #92400e;
+  font-weight: 500;
 }
 </style>

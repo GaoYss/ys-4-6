@@ -40,6 +40,11 @@
           <span v-if="row.installment_sequence">第 {{ row.installment_sequence }} 期</span>
           <span v-else>-</span>
         </template>
+        <template #cell-overdue="{ row }">
+          <span v-if="row.bill_is_overdue" class="overdue-tag">已逾期</span>
+          <span v-else-if="row.bill_ever_overdue" class="ever-overdue-tag">曾逾期</span>
+          <span v-else>-</span>
+        </template>
       </DataTable>
     </section>
 
@@ -211,6 +216,7 @@ const paymentColumns = [
   { key: "installment", label: "分期期次" },
   { key: "amount", label: "金额" },
   { key: "method", label: "方式" },
+  { key: "overdue", label: "逾期状态" },
   { key: "paid_at", label: "支付时间" }
 ];
 const installmentColumns = [

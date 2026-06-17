@@ -51,6 +51,7 @@
           <div class="status-col">
             <StatusBadge :status="row.status" />
             <span v-if="row.is_overdue && row.status !== 'overdue'" class="overdue-tag">已逾期</span>
+            <span v-else-if="row.status === 'paid' && row.ever_overdue" class="ever-overdue-tag">曾逾期</span>
           </div>
         </template>
         <template #cell-amount="{ row }">¥{{ Number(row.amount).toFixed(2) }}</template>
@@ -80,6 +81,14 @@
   border-radius: 10px;
   background: #ffe2e2;
   color: #b42318;
+  font-size: 12px;
+}
+.ever-overdue-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fef3c7;
+  color: #92400e;
   font-size: 12px;
 }
 </style>
